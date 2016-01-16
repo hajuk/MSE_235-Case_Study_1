@@ -1,4 +1,3 @@
-#Test
 # =========================================================================
 # Load Data ---------------------------------------------------------------
 
@@ -40,6 +39,11 @@ library(plyr)
 data$Location = mapvalues(data$Location, from = c("Other Floor", "Other ICU", "Other PACU", 
                                                   "Other PACU 2", "Floor", "Front Door"), 
                           to = c("Other", "Other", "Other", "Other", "Other", "Other"))
+
+
+# Drop patients whose origin (Location) is "Other"
+data = data[data$Location != "Other",]
+
 
 # =========================================================================
 # Generate New Data Columns -----------------------------------------------
