@@ -48,32 +48,32 @@ data = data[data$Location != "Other",]
 # Generate New Data Columns -----------------------------------------------
 
 # Calculate durations 
-
   duration = function (time_earlier, time_later) {
     library(zoo)
     t = as.double(difftime(time_later, time_earlier, units = "hours"))
     return(t)
   }
-  
-  #(1) Time.Patient.Wait
+
   data$Time.Patient.Wait = duration(data$Patient_Ready, data$Transfer)
-  
-  #(2) Time.Bed.Empty (duration for which the assigned bed is held empty)
-  data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer)
-  
-  #(3) Time.Patient.Stay
+  data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer) # duration for which the assigned bed is held empty
   data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
 
-# Assign paths
-  data[, "Path"] = paste(data$Location, "-", data$Unit)
+# Define paths
+  data[, "Path"] = paste(data$Location, "->", data$Unit)
   data$Path = as.factor(data$Path)
+  prop.table(table(data$Path))
+  
+  # Frequency table
+  library(gmodels)
+  CrossTable(data$Location, data$Unit, prop.t = TRUE, prop.chisq = FALSE)
 
 
-# Decompose Dates 
-# Patient_Ready
-data$Patient_Ready.month = format(data$Patient_Ready, "%m")
-data$Patient_Ready.date = format(data$Patient_Ready, "%Y-%m-%d")
-data$Patient_Ready.day = format(data$Patient_Ready, "%a")
+# # Decompose Dates 
+# # Patient_Ready
+# data$Patient_Ready.month = format(data$Patient_Ready, "%m")
+# data$Patient_Ready.date = format(data$Patient_Ready, "%Y-%m-%d")
+# data$Patient_Ready.day = format(data$Patient_Ready, "%a")
+  data$Patient_Ready.hour = format(data$Patient_Ready, "%H")
 
 
 
@@ -95,7 +95,31 @@ for (i in c(11:13)) {
 }
 
 
-# =========================================================================
+# TODO:=========================================================================
 # Calculate hourly demand at each location --------------------------------
 
+
+# Plot hourly trends by path ----------------------------------------------
+library(ggplot2)
+library(digest)
+
+# Influx to ICU
+ggplot(data[data$Unit == "ICU", ], aes(x = Patient_Ready.hour, fill = Location)) +
+  geom_bar(position = "dodge", alpha = 0.5) + 
+  ggtitle("Hourly Transfer Demand to ICU") +
+  labs(x = "Hour", y = "Demand", fill = "Start Location")
+
+# Influx to Floor
+ggplot(data[data$Unit == "Floor", ], aes(x = Patient_Ready.hour, fill = Location)) +
+  geom_bar(position = "dodge", alpha = 0.5) + 
+  ggtitle("Hourly Transfer Demand  to Floor") +
+  labs(x = "Hour", y = "Demand", fill = "Start Location")
+
+
+
+
+
+
+# Export data -------------------------------------------------------------
+write.csv(data, "data_processed.csv")
 
