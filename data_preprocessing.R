@@ -112,12 +112,8 @@ ggplot(data[data$Unit == "ICU", ], aes(x = Patient_Ready.hour, fill = Location))
 # Influx to Floor
 ggplot(data[data$Unit == "Floor", ], aes(x = Patient_Ready.hour, fill = Location)) +
   geom_bar(position = "dodge", alpha = 0.5) + 
-  ggtitle("Hourly Transfer Demand  to Floor") +
+  ggtitle("Hourly Transfer Demand to Floor") +
   labs(x = "Hour", y = "Demand", fill = "Start Location")
-
-
-
-
 
 
 # Export data -------------------------------------------------------------
