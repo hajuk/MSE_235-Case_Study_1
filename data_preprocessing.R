@@ -3,7 +3,7 @@
 
 # Set source path and working directory
 # Note: change to the directory where you save the .csv file 
-
+rm(list = ls())
 source_path = "~/Dropbox/Stanford/2015-2016/2Q/MS&E 235/Case Study 1"
 setwd(source_path)
 
@@ -44,32 +44,36 @@ data$Location = mapvalues(data$Location, from = c("Other Floor", "Other ICU", "O
 # Drop patients whose origin (Location) is "Other"
 data = data[data$Location != "Other",]
 
-
 # =========================================================================
 # Generate New Data Columns -----------------------------------------------
 
 # Calculate durations 
 
-duration = function (time_earlier, time_later) {
-  library(zoo)
-  t = as.double(difftime(time_later, time_earlier, units = "hours"))
-  return(t)
-}
+  duration = function (time_earlier, time_later) {
+    library(zoo)
+    t = as.double(difftime(time_later, time_earlier, units = "hours"))
+    return(t)
+  }
+  
+  #(1) Time.Patient.Wait
+  data$Time.Patient.Wait = duration(data$Patient_Ready, data$Transfer)
+  
+  #(2) Time.Bed.Empty (duration for which the assigned bed is held empty)
+  data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer)
+  
+  #(3) Time.Patient.Stay
+  data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
 
-# (1) Time.Patient.Wait
-data$Time.Patient.Wait = duration(data$Patient_Ready, data$Transfer)
-
-# (2) Time.Bed.Empty (duration for which the assigned bed is held empty)
-data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer)
-
-# (3) Time.Patient.Stay
-data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
+# Assign paths
+  data[, "Path"] = paste(data$Location, "-", data$Unit)
+  data$Path = as.factor(data$Path)
 
 
-# Decompose Dates (?NEEDS TO BE UPDATED)
-months(data$Patient_Ready)
-Dates(data$Patient_Ready)
-weekdays(data$Patient_Ready)
+# Decompose Dates 
+# Patient_Ready
+data$Patient_Ready.month = format(data$Patient_Ready, "%m")
+data$Patient_Ready.date = format(data$Patient_Ready, "%Y-%m-%d")
+data$Patient_Ready.day = format(data$Patient_Ready, "%a")
 
 
 
@@ -89,4 +93,9 @@ par(mfrow = c(1,3))
 for (i in c(11:13)) {
   hist(data[, i], main = paste(colnames(data[i])),  xlab = paste(colnames(data[i]), "(hr)"))
 }
+
+
+# =========================================================================
+# Calculate hourly demand at each location --------------------------------
+
 
