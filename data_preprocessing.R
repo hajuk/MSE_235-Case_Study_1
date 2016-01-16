@@ -2,6 +2,8 @@
 # Load Data ---------------------------------------------------------------
 
 # Set source path and working directory
+# Note: change to the directory where you save the .csv file 
+
 source_path = "~/Dropbox/Stanford/2015-2016/2Q/MS&E 235/Case Study 1"
 setwd(source_path)
 
