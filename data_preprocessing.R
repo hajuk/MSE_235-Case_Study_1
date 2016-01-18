@@ -4,7 +4,13 @@
 # Set source path and working directory
 # Note: change to the directory where you save the .csv file 
 rm(list = ls())
-source_path = "E:/Stanford/2.2 Year 2 Winter/MS&E 263 Healthcare Management/Case/Case 1 MGH Neurosciences/MSE_235-Case_Study_1/"
+
+#Eric
+#source_path = "E:/Stanford/2.2 Year 2 Winter/MS&E 263 Healthcare Management/Case/Case 1 MGH Neurosciences/MSE_235-Case_Study_1/"
+
+#Haju
+source_path = "~/Dropbox/Stanford/2015-2016/2Q/MS&E 235/Case Study 1"
+
 setwd(source_path)
 
 # Import the dataset
@@ -59,9 +65,9 @@ duration = function (time_earlier, time_later) {
 #data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
 
 data$request2assignment = duration(data$Bed_Request, data$Bed_Assignment)
-data$assignment2transfer = duration(data$Bed_Assignment, data$Transfer)
-data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit)
-data$ready2transfer = duration(data$Patient_Ready, data$Transfer)
+data$assignment2transfer = duration(data$Bed_Assignment, data$Transfer) # Empty bed time
+data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit) # Patient's duration of stay
+data$ready2transfer = duration(data$Patient_Ready, data$Transfer) # Patient wait time
 
 
 # Define paths
@@ -103,20 +109,28 @@ sum(data$error.assignment2transfer)
 sum(data$error.transfer2out)
 sum(data$error.ready2transfer)
 
-
-
-
-
 # Plot histogram 
 par(mfrow = c(1,3))
 for (i in c(11:13)) {
   hist(data[, i], main = paste(colnames(data[i])),  xlab = paste(colnames(data[i]), "(hr)"))
 }
 
+# Plot box plot (to identify outliers)
+
+ggplot(data, aes(x = Unit, y = ready2transfer, fill = Location)) +
+  geom_boxplot() +
+  ggtitle("Box Plot Comparison of Patient Wait Time at Floor and ICU") +
+  labs(x = "Unit", y = "Patient Wait Time", fill = "Start Location")
+
+# TODO: Incomplete
+p = ggplot(data, aes(x = Path, y = ready2transfer, fill = Location)) +
+  geom_boxplot(outlier.shape = "o") +
+  ggtitle("Box Plot Comparison of Patient Wait Time at Floor and ICU") +
+  labs(x = "Unit", y = "Patient Wait Time", fill = "Start Location")
 
 # TODO:=========================================================================
 # Calculate hourly demand at each location --------------------------------
-
+# Note: refer to the prof.'s email 
 
 # Plot hourly trends by path ----------------------------------------------
 library(ggplot2)
