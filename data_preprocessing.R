@@ -170,6 +170,19 @@ ggplot(data[data$Unit == "Floor", ], aes(x = Patient_Ready.hour, fill = Location
   labs(x = "Hour", y = "Demand", fill = "Start Location")
 
 
+
+# Calculate the occupancy at each location --------------------------------
+# TODO:
+# The occupancy: (# Transfers into that unit before that date-time) minus the total number of Departures (Time out of unit)s. Here are the steps to calculate this.
+# Create a subset of the data that includes only those lines where patients transferred into the unit of interest (Filter in Excel or the subset() command in R)
+# Determine when you want the occupancy on the given day (noon, 3pm, midnight, etc.) for example noon would be 02/01/2012 12:00:00 - if you are working in R, I recommend the Lubridate package that you've seen in the R scripts I've provided
+# Add up the number of lines where the transfer time is less than 02/01/2012 12:00:00 - call this X
+# Add up the number of lines where the Out of Unit Time is less than 02/01/2012 12:00:00 - call this Y
+# Occupancy =  X - Y (except for the first couple of weeks of the data set - think about why).
+# Create a new object (column in Excel or vector in R) with one entry for each date/time of interest and repeat steps 1 - 5 for each entry in this object.
+
+
+
 # Export data -------------------------------------------------------------
 write.csv(data, "data_processed.csv")
 
