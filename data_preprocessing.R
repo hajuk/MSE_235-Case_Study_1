@@ -4,7 +4,7 @@
 # Set source path and working directory
 # Note: change to the directory where you save the .csv file 
 rm(list = ls())
-source_path = "~/Dropbox/Stanford/2015-2016/2Q/MS&E 235/Case Study 1"
+source_path = "E:/Stanford/2.2 Year 2 Winter/MS&E 263 Healthcare Management/Case/Case 1 MGH Neurosciences/MSE_235-Case_Study_1/"
 setwd(source_path)
 
 # Import the dataset
@@ -16,12 +16,12 @@ str(data)
 
 # Convert to "Date" variables
 library(zoo)
-
-data$Patient_Ready = strptime(data$Patient_Ready, format = "%d/%m/%Y %H:%M:%S")
-data$Bed_Request = strptime(data$Bed_Request, format = "%d/%m/%Y %H:%M:%S")
-data$Bed_Assignment = strptime(data$Bed_Assignment, format = "%d/%m/%Y %H:%M:%S")
-data$Transfer = strptime(data$Transfer, format = "%d/%m/%Y %H:%M:%S")
-data$Time_Out_of_Unit = strptime(data$Time_Out_of_Unit, format = "%d/%m/%Y %H:%M:%S")
+#check the csv file to see if the date format matches
+data$Patient_Ready = strptime(data$Patient_Ready, format = "%m/%d/%Y %H:%M:%S")
+data$Bed_Request = strptime(data$Bed_Request, format = "%m/%d/%Y %H:%M:%S")
+data$Bed_Assignment = strptime(data$Bed_Assignment, format = "%m/%d/%Y %H:%M:%S")
+data$Transfer = strptime(data$Transfer, format = "%m/%d/%Y %H:%M:%S")
+data$Time_Out_of_Unit = strptime(data$Time_Out_of_Unit, format = "%m/%d/%Y %H:%M:%S")
 
 # Convert to factor variables
 colChr = sapply(data, is.character)
@@ -48,24 +48,30 @@ data = data[data$Location != "Other",]
 # Generate New Data Columns -----------------------------------------------
 
 # Calculate durations 
-  duration = function (time_earlier, time_later) {
-    library(zoo)
-    t = as.double(difftime(time_later, time_earlier, units = "hours"))
-    return(t)
-  }
+duration = function (time_earlier, time_later) {
+  library(zoo)
+  t = as.double(difftime(time_later, time_earlier, units = "hours"))
+  return(t)
+}
 
-  data$Time.Patient.Wait = duration(data$Patient_Ready, data$Transfer)
-  data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer) # duration for which the assigned bed is held empty
-  data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
+#data$Time.Patient.Wait = duration(data$Patient_Ready, data$Transfer)
+#data$Time.Bed.Empty = duration(data$Bed_Assignment, data$Transfer) # duration for which the assigned bed is held empty
+#data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
+
+data$request2assignment = duration(data$Bed_Request, data$Bed_Assignment)
+data$assignment2transfer = duration(data$Bed_Assignment, data$Transfer)
+data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit)
+data$ready2transfer = duration(data$Patient_Ready, data$Transfer)
+
 
 # Define paths
-  data[, "Path"] = paste(data$Location, "->", data$Unit)
-  data$Path = as.factor(data$Path)
-  prop.table(table(data$Path))
-  
-  # Frequency table
-  library(gmodels)
-  CrossTable(data$Location, data$Unit, prop.t = TRUE, prop.chisq = FALSE)
+data[, "Path"] = paste(data$Location, "->", data$Unit)
+data$Path = as.factor(data$Path)
+prop.table(table(data$Path))
+
+# Frequency table
+library(gmodels)
+CrossTable(data$Location, data$Unit, prop.t = TRUE, prop.chisq = FALSE)
 
 
 # # Decompose Dates 
@@ -73,7 +79,7 @@ data = data[data$Location != "Other",]
 # data$Patient_Ready.month = format(data$Patient_Ready, "%m")
 # data$Patient_Ready.date = format(data$Patient_Ready, "%Y-%m-%d")
 # data$Patient_Ready.day = format(data$Patient_Ready, "%a")
-  data$Patient_Ready.hour = format(data$Patient_Ready, "%H")
+data$Patient_Ready.hour = format(data$Patient_Ready, "%H")
 
 
 
@@ -81,12 +87,25 @@ data = data[data$Location != "Other",]
 # Identify Errorneous Data Entries ----------------------------------------
 
 # Find erroneous data (Duration < 0)
-time.vars = c("Time.Patient.Wait", "Time.Bed.Empty", "Time.Patient.Stay")
+time.vars = c("request2assignment", "assignment2transfer", "transfer2out","ready2transfer")
+error.vector = c("error.request2assignment", "error.assignment2transfer", "error.transfer2out","error.ready2transfer")
 numCol = ncol(data)
-for (varname in time.vars) {
-  data[which(data[, varname] < 0 ), numCol + 1] = 1
-  data[which(data[, varname] >= 0 ), numCol + 1] = 0
+data$error.request2assignment = rep(0,nrow(data))
+data$error.assignment2transfer = rep(0,nrow(data))
+data$error.transfer2out = rep(0,nrow(data))
+data$error.ready2transfer = rep(0,nrow(data))
+for (i in 1:4 ) {
+  data[which(data[, time.vars[i]] < 0 ), error.vector[i]] = 1
 }
+
+sum(data$error.request2assignment)
+sum(data$error.assignment2transfer)
+sum(data$error.transfer2out)
+sum(data$error.ready2transfer)
+
+
+
+
 
 # Plot histogram 
 par(mfrow = c(1,3))
