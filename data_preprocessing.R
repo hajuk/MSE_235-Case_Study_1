@@ -5,10 +5,10 @@
 # Note: change to the directory where you save the .csv file 
 rm(list = ls())
 
-#Eric
-#source_path = "E:/Stanford/2.2 Year 2 Winter/MS&E 263 Healthcare Management/Case/Case 1 MGH Neurosciences/MSE_235-Case_Study_1/"
+# Eric
+# source_path = "E:/Stanford/2.2 Year 2 Winter/MS&E 263 Healthcare Management/Case/Case 1 MGH Neurosciences/MSE_235-Case_Study_1/"
 
-#Haju
+# Haju
 source_path = "~/Dropbox/Stanford/2015-2016/2Q/MS&E 235/Case Study 1"
 
 setwd(source_path)
@@ -22,12 +22,12 @@ str(data)
 
 # Convert to "Date" variables
 library(zoo)
+
 #check the csv file to see if the date format matches
-data$Patient_Ready = strptime(data$Patient_Ready, format = "%m/%d/%Y %H:%M:%S")
-data$Bed_Request = strptime(data$Bed_Request, format = "%m/%d/%Y %H:%M:%S")
-data$Bed_Assignment = strptime(data$Bed_Assignment, format = "%m/%d/%Y %H:%M:%S")
-data$Transfer = strptime(data$Transfer, format = "%m/%d/%Y %H:%M:%S")
-data$Time_Out_of_Unit = strptime(data$Time_Out_of_Unit, format = "%m/%d/%Y %H:%M:%S")
+colDate = c("Patient_Ready", "Bed_Request", "Bed_Assignment","Transfer", "Time_Out_of_Unit")
+for (varname in colDate) {
+  data[[varname]] = strptime(data[[varname]], format = "%m/%d/%y %H:%M")
+}
 
 # Convert to factor variables
 colChr = sapply(data, is.character)
@@ -65,10 +65,9 @@ duration = function (time_earlier, time_later) {
 #data$Time.Patient.Stay = duration(data$Transfer, data$Time_Out_of_Unit)
 
 data$request2assignment = duration(data$Bed_Request, data$Bed_Assignment)
-data$assignment2transfer = duration(data$Bed_Assignment, data$Transfer) # Empty bed time
-data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit) # Patient's duration of stay
-data$ready2transfer = duration(data$Patient_Ready, data$Transfer) # Patient wait time
-
+data$assignment2transfer = duration(data$Bed_Assignment, data$Transfer)
+data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit)
+data$ready2transfer = duration(data$Patient_Ready, data$Transfer)
 
 # Define paths
 data[, "Path"] = paste(data$Location, "->", data$Unit)
@@ -79,7 +78,6 @@ prop.table(table(data$Path))
 library(gmodels)
 CrossTable(data$Location, data$Unit, prop.t = TRUE, prop.chisq = FALSE)
 
-
 # # Decompose Dates 
 # # Patient_Ready
 # data$Patient_Ready.month = format(data$Patient_Ready, "%m")
@@ -87,13 +85,11 @@ CrossTable(data$Location, data$Unit, prop.t = TRUE, prop.chisq = FALSE)
 # data$Patient_Ready.day = format(data$Patient_Ready, "%a")
 data$Patient_Ready.hour = format(data$Patient_Ready, "%H")
 
-
-
 # =========================================================================
 # Identify Errorneous Data Entries ----------------------------------------
 
 # Find erroneous data (Duration < 0)
-time.vars = c("request2assignment", "assignment2transfer", "transfer2out","ready2transfer")
+colTime = c("request2assignment", "assignment2transfer", "transfer2out","ready2transfer")
 error.vector = c("error.request2assignment", "error.assignment2transfer", "error.transfer2out","error.ready2transfer")
 numCol = ncol(data)
 data$error.request2assignment = rep(0,nrow(data))
@@ -101,39 +97,64 @@ data$error.assignment2transfer = rep(0,nrow(data))
 data$error.transfer2out = rep(0,nrow(data))
 data$error.ready2transfer = rep(0,nrow(data))
 for (i in 1:4 ) {
-  data[which(data[, time.vars[i]] < 0 ), error.vector[i]] = 1
+  data[which(data[, colTime[i]] < 0 ), error.vector[i]] = 1
 }
 
-sum(data$error.request2assignment)
+sum(data$error.request2assignment) # 684 errors (bed assignment before request)
 sum(data$error.assignment2transfer)
 sum(data$error.transfer2out)
 sum(data$error.ready2transfer)
 
 # Plot histogram 
-par(mfrow = c(1,3))
-for (i in c(11:13)) {
+par(mfrow = c(2,2))
+for (i in c(11:14)) {
   hist(data[, i], main = paste(colnames(data[i])),  xlab = paste(colnames(data[i]), "(hr)"))
 }
+# Note: request2assignment error also visible in the histogram
 
-# Plot box plot (to identify outliers)
 
-ggplot(data, aes(x = Unit, y = ready2transfer, fill = Location)) +
-  geom_boxplot() +
-  ggtitle("Box Plot Comparison of Patient Wait Time at Floor and ICU") +
-  labs(x = "Unit", y = "Patient Wait Time", fill = "Start Location")
+# Identify outliers by box plots
+library(ggplot2)
+library(gridExtra)
 
-# TODO: Incomplete
-p = ggplot(data, aes(x = Path, y = ready2transfer, fill = Location)) +
-  geom_boxplot(outlier.shape = "o") +
-  ggtitle("Box Plot Comparison of Patient Wait Time at Floor and ICU") +
-  labs(x = "Unit", y = "Patient Wait Time", fill = "Start Location")
+plots = lapply(colTime, function(x)
+  ggplot(data, aes(x = Location, y = data[, x], fill = Unit)) +
+    geom_boxplot() +
+    ggtitle(paste("Box Plot Comparison of ", x, " time")) +
+    labs(x = "Start Location", y = paste(x, "Time"), fill = "Unit") +
+    coord_flip()
+)
+
+do.call(grid.arrange, plots)
+
+# # Floor
+# ggplot(data[data$Unit == "Floor", ], aes(x = Location, y = ready2transfer, fill = Location)) +
+#   geom_boxplot() +
+#   ggtitle("Box Plot Comparison of Patient Wait Time at Floor") +
+#   labs(x = "Start Location", y = "ready2transfer", fill = "Starting Location")
+# 
+# # ICU 
+# ggplot(data[data$Unit == "ICU", ], aes(x = Location, y = ready2transfer, fill = Location)) +
+#   geom_boxplot() +
+#   ggtitle("Box Plot Comparison of Patient Wait Time ICU") +
+#   labs(x = "Start Location", y = "ready2transfer", fill = "Start Location")
+#   
+# # Both
+# p1 = ggplot(data, aes(x = Path, y = data[[varname]], fill = Location)) +
+#   geom_boxplot(outlier.shape = "o") +
+#   ggtitle(paste("Box Plot Comparison of ", varname, " time")) +
+#   labs(x = "Unit", y = paste(varname), fill = "Start Location")
+# 
+# p3 = ggplot(data, aes(x = Location, y = data[[varname]], fill = Unit)) +
+#   geom_boxplot() +
+#   ggtitle(paste("Box Plot Comparison of ", varname, " time")) +
+#   labs(x = "Start Location", y = paste(varname), fill = "Unit")
 
 # TODO:=========================================================================
 # Calculate hourly demand at each location --------------------------------
-# Note: refer to the prof.'s email 
+
 
 # Plot hourly trends by path ----------------------------------------------
-library(ggplot2)
 library(digest)
 
 # Influx to ICU
