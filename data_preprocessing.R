@@ -70,9 +70,15 @@ data$transfer2out = duration(data$Transfer, data$Time_Out_of_Unit)
 data$ready2transfer = duration(data$Patient_Ready, data$Transfer)
 
 # Define paths
+# Location to Unit
 data[, "Path"] = paste(data$Location, "->", data$Unit)
 data$Path = as.factor(data$Path)
 prop.table(table(data$Path))
+
+# Location to Floor
+data[, "Path_Floor"] = paste(data$Location, "->", data$Floor_Number)
+data$Path_Floor = as.factor(data$Path_Floor)
+prop.table(table(data$Path_Floor))
 
 # Frequency table
 library(gmodels)
@@ -105,6 +111,14 @@ sum(data$error.assignment2transfer)
 sum(data$error.transfer2out)
 sum(data$error.ready2transfer)
 
+
+# Analyze the ones with negative request2assignment
+data_neg = data[data$request2assignment < 0, ]
+prop.table(table(data_neg$Path))
+prop.table(table(data_neg$Location))
+prop.table(table(data_neg$Unit))
+
+
 # Plot histogram 
 par(mfrow = c(2,2))
 for (i in c(11:14)) {
@@ -117,6 +131,7 @@ for (i in c(11:14)) {
 library(ggplot2)
 library(gridExtra)
 
+# Box Plot (Location / Unit)
 plots = lapply(colTime, function(x)
   ggplot(data, aes(x = Location, y = data[, x], fill = Unit)) +
     geom_boxplot() +
@@ -126,6 +141,16 @@ plots = lapply(colTime, function(x)
 )
 
 do.call(grid.arrange, plots)
+
+plots_f = lapply(colTime, function(x)
+  ggplot(data, aes(x = Location, y = data[, x], fill = Floor_Number)) +
+    geom_boxplot() +
+    ggtitle(paste("Box Plot Comparison of ", x, " time")) +
+    labs(x = "Start Location", y = paste(x, "Time"), fill = "Floor_Number") +
+    coord_flip()
+)
+
+do.call(grid.arrange, plots_f)
 
 # # Floor
 # ggplot(data[data$Unit == "Floor", ], aes(x = Location, y = ready2transfer, fill = Location)) +
@@ -153,7 +178,6 @@ do.call(grid.arrange, plots)
 # TODO:=========================================================================
 # Calculate hourly demand at each location --------------------------------
 
-
 # Plot hourly trends by path ----------------------------------------------
 library(digest)
 
@@ -169,20 +193,99 @@ ggplot(data[data$Unit == "Floor", ], aes(x = Patient_Ready.hour, fill = Location
   ggtitle("Hourly Transfer Demand to Floor") +
   labs(x = "Hour", y = "Demand", fill = "Start Location")
 
-
-
+# 
 # Calculate the occupancy at each location --------------------------------
-# TODO:
-# The occupancy: (# Transfers into that unit before that date-time) minus the total number of Departures (Time out of unit)s. Here are the steps to calculate this.
-# Create a subset of the data that includes only those lines where patients transferred into the unit of interest (Filter in Excel or the subset() command in R)
-# Determine when you want the occupancy on the given day (noon, 3pm, midnight, etc.) for example noon would be 02/01/2012 12:00:00 - if you are working in R, I recommend the Lubridate package that you've seen in the R scripts I've provided
-# Add up the number of lines where the transfer time is less than 02/01/2012 12:00:00 - call this X
-# Add up the number of lines where the Out of Unit Time is less than 02/01/2012 12:00:00 - call this Y
-# Occupancy =  X - Y (except for the first couple of weeks of the data set - think about why).
-# Create a new object (column in Excel or vector in R) with one entry for each date/time of interest and repeat steps 1 - 5 for each entry in this object.
+library(hillmakeR)
+library(plyr)
+library(doBy)
+
+# Determine how many patients are at each given location each hour
+listFloor = c("L06", "L07", "L08")
+
+for (floorName in listFloor) {
+  data_sub = data[data$Floor_Number == floorName, ]
+  
+  occupancy_temp = occupancy(startTimes = as.POSIXct(data_sub$Transfer), 
+                             stopTimes = as.POSIXct(data_sub$Time_Out_of_Unit), 
+                             resolution = "hour")
+  
+  occupancy_temp$hour = as.POSIXlt(occupancy_temp$times)$hour
+  
+  byHourOfDay = ddply(occupancy_temp, c("hour"),
+                      function(x) c(min = min(x$counts),
+                                    mean = mean(x$counts),
+                                    median = median(x$counts),
+                                    q90 = quantile(x$counts, 0.9, names = FALSE),
+                                    max = max(x$counts)
+                      )
+  )
+  varName = paste0("occupancy_", floorName)
+  assign(varName, occupancy)
+  varName = paste0("occupancy_hourly_", floorName)
+  assign(varName, byHourOfDay)
+}
+
+colnames(occupancy_L06)[2] = "L6_Counts"
+colnames(occupancy_L07)[2] = "L7_Counts"
+colnames(occupancy_L08)[2] = "L8_Counts"
+
+occupancy = join_all(list(occupancy_L06, occupancy_L07, occupancy_L08), by = "times", type = "full")
+
+# byHourAndFloor = ddply(occupancy, c("hour"),
+#                        function(x) {c(min = min(x),
+#                                      mean = mean(x),
+#                                      median = median(x),
+#                                      q90 = quantile(x, 0.9, names = FALSE),
+#                                      max = max(x)
+#                                      )
+# )
+
+# Determine how many patietns are at hospital by hour of day
+patientCount = occupancy(startTimes = as.POSIXct(data$Transfer), stopTimes = as.POSIXct(data$Time_Out_of_Unit), resolution = "hour")
+patientCount$hour = as.POSIXlt(patientCount$times)$hour
+byHourOfDay = ddply(patientCount, c("hour"),
+                    function(x) c(min = min(x$counts),
+                                  mean = mean(x$counts),
+                                  median = median(x$counts),
+                                  q90 = quantile(x$counts, 0.9, names = FALSE),
+                                  max = max(x$counts)
+                                  )
+                    )
+
+# Display the output graphically
+# 
+# plot(byHourOfDay$mean, type = "o")
+
+ggplot(byHourOfDay, aes(x = hour, y = mean)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  xlim(0, 23) +
+  scale_x_continuous(breaks = 0:23) 
+  
 
 
+# 
+# library(lubridate)
+# head(ymd_hms(data$Patient_Ready.hour))
+# # The occupancy: (# Transfers into that unit before that date-time) minus the total number of Departures (Time out of unit)s. Here are the steps to calculate this.
+# 
+# # Create a subset of the data that includes only those lines where patients transferred into the unit of interest (Filter in Excel or the subset() command in R)
+# #format(data$Patient_Ready, format="%m/%d/%y %H:00")
+# 
+# # Determine when you want the occupancy on the given day (noon, 3pm, midnight, etc.) for example noon would be 02/01/2012 12:00:00 - if you are working in R, I recommend the Lubridate package that you've seen in the R scripts I've provided
+# data_occupancy = data.frame(seq(from = as.POSIXct("2012-01-01 00:00"), to = as.POSIXct("2013-07-01 00:00"), by = "hour"))
+# colnames(data_occupancy)[1] = "Time"
+# 
+# # Add up the number of lines where the transfer time is less than 02/01/2012 12:00:00 - call this X
+# 
+
+# 
+# # Add up the number of lines where the Out of Unit Time is less than 02/01/2012 12:00:00 - call this Y
+# 
+# # Occupancy =  X - Y (except for the first couple of weeks of the data set - think about why).
+# 
+# # Create a new object (column in Excel or vector in R) with one entry for each date/time of interest and repeat steps 1 - 5 for each entry in this object.
+# # 
 
 # Export data -------------------------------------------------------------
 write.csv(data, "data_processed.csv")
-
