@@ -289,3 +289,42 @@ ggplot(byHourOfDay, aes(x = hour, y = mean)) +
 
 # Export data -------------------------------------------------------------
 write.csv(data, "data_processed.csv")
+
+
+
+## TEST
+# Clear workspace
+rm(list = ls(all.names = TRUE))
+
+# Set source path, working directory, and filename
+source_path = "~/Google Drive/W16-MS&E-235/Homework 3"
+setwd(source_path)
+rm(source_path)
+
+# Import the csv file and save into a data frame
+df.train = read.csv("churn_train.csv", header = TRUE, stringsAsFactors = TRUE, na.strings = "")
+df.test = read.csv("churn_test.csv", header = TRUE, stringsAsFactors = TRUE, na.strings = "")
+
+head(df.train, 5)
+
+# Remove the first column (Customer ID) from the data frame
+df.train = df.train[, 2:ncol(df.train)]
+df.test = df.test[, 2:ncol(df.test)]
+
+# Check variable types
+sapply(df.train, class)
+
+# Apply SVM
+## (1) Linear Kernel
+library(caret)
+svm.fitControl = trainControl(method = "cv", number = 10, classProbs = TRUE, summaryFunction = twoClassSummary)
+
+svmLinearGrid = expand.grid(C = c(0.001, 0.01, 0.1, 1, 5, 10, 100))
+svmLinearTune = train(LEAVE ~ ., data = df.train, method = "svmLinear", verbose = TRUE, metric = "ROC", 
+                      tuneGrid = svmLinearGrid, trControl = svm.fitControl)
+
+
+## (2) Polynomial Kernel
+svmPolyGrid = expand.grid(degree = c(2, 3), scale = c(0.001, 0.01, 0.1, 1, 10, 100), C = c(0.001, 0.01, 0.1, 1, 10, 100))
+svmPolyTune = train(LEAVE ~ ., data = df.train, method = "svmPoly", verbose = TRUE, metric = "ROC",
+                    tuneGrid = svmPolyGrid, trControl = svm.fitControl)
