@@ -328,3 +328,75 @@ svmLinearTune = train(LEAVE ~ ., data = df.train, method = "svmLinear", verbose 
 svmPolyGrid = expand.grid(degree = c(2, 3), scale = c(0.001, 0.01, 0.1, 1, 10, 100), C = c(0.001, 0.01, 0.1, 1, 10, 100))
 svmPolyTune = train(LEAVE ~ ., data = df.train, method = "svmPoly", verbose = TRUE, metric = "ROC",
                     tuneGrid = svmPolyGrid, trControl = svm.fitControl)
+##########HERE
+# Clear workspace
+rm(list = ls(all.names = TRUE))
+
+# Set source path, working directory, and filename
+source_path = "~/Google Drive/W16-MS&E-235/Homework 3"
+setwd(source_path)
+rm(source_path)
+
+# Import the csv file and save into a data frame
+df.train = read.csv("churn_train.csv", header = TRUE, stringsAsFactors = TRUE, na.strings = "")
+df.test = read.csv("churn_test.csv", header = TRUE, stringsAsFactors = TRUE, na.strings = "")
+
+head(df.train, 5)
+
+# Remove the first column (Customer ID) from the data frame
+df.train = df.train[, -1]
+df.test = df.test[, -1]
+
+# Check variable types
+sapply(df.train, class)
+
+# Apply SVMl
+## (1) Radial Kernel
+library(e1071)
+library(caret)
+attach(df.train)
+svm_tune = tune(method = "svm", LEAVE ~ ., data = df.train,
+                kernel = "radial", ranges = list(cost = 10^(-1:2), gamma = c(0.5, 1, 2)))
+                
+model.svm = svm(LEAVE ~ ., data = df.train)
+
+pred.svm = predict(model.svm, df.test)
+t = confusionMatrix(data = pred.svm, reference = df.test$LEAVE)
+200*(t$table[1,1] + t$table[1,2]) + 1000*(t$table[2,1]) #1106400 BAD :(
+
+## (2) Linear Kernel
+library(kernlab)
+
+svm.fitControl = trainControl(method = "cv", number = 10, classProbs = TRUE, summaryFunction = twoClassSummary)
+
+svmLinearGrid = expand.grid(C = c(0.001, 0.01))
+# , 0.1, 1, 5, 10, 100
+svmLinearTune = train(LEAVE ~ ., data = df.train, method = "svmLinear", trace = TRUE, metric = "ROC",
+                      tuneGrid = svmLinearGrid, trControl = svm.fitControl)
+
+pred.svm.linear = predict(svmLinearTune, df.test)
+t = confusionMatrix(data = pred.svm.linear, reference = df.test$LEAVE)
+200*(t$table[1,1] + t$table[1,2]) + 1000*(t$table[2,1]) #1194400 BAD :(
+
+## (3) Polynomial Kernel
+svmPolyGrid = expand.grid(degree = c(2, 3), scale = c(0.001, 0.01, 0.1, 1, 10, 100), C = c(0.001, 0.01, 0.1, 1, 10, 100))
+svmPolyTune = train(LEAVE ~ ., data = df.train, method = "svmPoly", trace = TRUE, metric = "ROC",
+                    tuneGrid = svmPolyGrid, trControl = svm.fitControl)
+
+
+# C50 Classification Tree (Best so far)
+library(C50)
+
+costs = matrix(c(200, 200, 1000, 0) , 2)
+colnames(costs) = rownames(costs) = c("LEAVE", "STAY")
+costs
+
+q3_c50 = C5.0(q3.df.train[, -12], q3.df.train$LEAVE, trials = 100, costs = costs)
+df_pred = predict(q3_c50, q3.df.test)
+
+t = confusionMatrix(df_pred, q3.df.test$LEAVE)
+
+200*(t$table[1,1] + t$table[1,2]) + 1000*(t$table[2,1]) # $740,600
+
+
+
